@@ -1,0 +1,48 @@
+version: '3.8'
+
+networks:
+  waha-network:
+    driver: bridge
+
+services:
+  fastapi:
+    build:
+      context: .
+      dockerfile: ./api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - waha
+      - redis
+    networks:
+      - waha-network
+
+  waha:
+    image: devlikeapro/waha
+    ports:
+      - "3000:3000"
+    environment:
+      - WAHA_PRINT_QR=false
+      - TZ=America/Sao_Paulo
+    networks:
+      - waha-network
+
+  webhook-config:
+    image: curlimages/curl:latest
+    volumes:
+      - ./configure-webhook.sh:/configure-webhook.sh
+    entrypoint: ["/bin/sh", "/configure-webhook.sh"]
+    depends_on:
+      - waha
+      - fastapi
+    networks:
+      - waha-network
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6380:6379"
+    networks:
+      - waha-network     
