@@ -5,6 +5,26 @@ networks:
     driver: bridge
 
 services:
+  waha:
+    image: devlikeapro/waha
+    ports:
+      - "3000:3000"
+    environment:
+      - WAHA_PRINT_QR=false
+      - TZ=America/Sao_Paulo
+    networks:
+      - waha-network
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6380:6379"
+    volumes:
+      - ./redisdb:/data
+    command: redis-server --save 60 1 --loglevel warning    
+    networks:
+      - waha-network
+
   fastapi:
     build:
       context: .
@@ -13,19 +33,12 @@ services:
       - "8000:8000"
     environment:
       - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./chromadb:/api/chromadb      
     depends_on:
       - waha
       - redis
-    networks:
-      - waha-network
-
-  waha:
-    image: devlikeapro/waha
-    ports:
-      - "3000:3000"
-    environment:
-      - WAHA_PRINT_QR=false
-      - TZ=America/Sao_Paulo
     networks:
       - waha-network
 
@@ -40,9 +53,17 @@ services:
     networks:
       - waha-network
 
-  redis:
-    image: redis:latest
+  streamlit:
+    build:
+      context: .
+      dockerfile: ./app/Dockerfile
     ports:
-      - "6380:6379"
+      - "8501:8501"
+    volumes:
+      - ./chromadb:/app/chromadb
+    depends_on:
+      - waha
+      - redis
+      - fastapi
     networks:
-      - waha-network     
+      - waha-network      

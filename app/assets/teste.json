@@ -1,0 +1,30 @@
+{
+    "store_name": "Friendly Neighborhood Market",
+    "address": "123 Main Street, Anytown, USA",
+    "hours": {
+        "monday": "9:00 AM - 9:00 PM",
+        "tuesday": "9:00 AM - 9:00 PM",
+        "wednesday": "9:00 AM - 9:00 PM",
+        "thursday": "9:00 AM - 9:00 PM",
+        "friday": "9:00 AM - 10:00 PM",
+        "saturday": "10:00 AM - 10:00 PM",
+        "sunday": "11:00 AM - 7:00 PM"
+    },
+    "contact": {
+        "phone": "+1 (555) 123-4567",
+        "email": "info@friendlymarket.com"
+    },
+    "departments": [
+        "Groceries",
+        "Fresh Produce",
+        "Bakery",
+        "Deli",
+        "Household Items"
+    ],
+    "payment_methods": [
+        "Cash",
+        "Credit Card",
+        "Debit Card",
+        "Mobile Payment"
+    ]
+}

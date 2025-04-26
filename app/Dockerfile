@@ -6,6 +6,6 @@ RUN pip install --upgrade pip && \
     pip install uv && \
     uv sync --frozen --no-install-project --no-dev
 
-EXPOSE 8000
+EXPOSE 8501
 
-CMD ["uv", "run", "./api/main.py"]
+CMD ["uv", "run", "streamlit", "run", "./app/home.py"]

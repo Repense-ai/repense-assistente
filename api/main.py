@@ -1,24 +1,34 @@
 import os
-
 import redis
 import requests
 
 from fastapi import FastAPI, Request
 from memory import RedisManager
 
+
 app = FastAPI()
 
 # Initialize Redis client
 redis_client = redis.Redis.from_url(
-    os.getenv('REDIS_URL', 'redis://localhost:6379')
+    os.getenv('REDIS_URL', 'redis://localhost:6379'),
+    decode_responses=True
 )
 
+@app.get("/hello")
+async def hello_world():
+    config_manager = RedisManager(redis_client, "config")
+    config = config_manager.get_memory_dict()
+    if not config:
+        return {"message": "No configuration found!"}
+    return {
+        "configured_message": config.get("hello_message", "No message configured"),
+        "last_updated": config.get("timestamp", "Unknown")
+    }
 
 @app.get("/")
 async def root(request: Request):
     print(f"Received request: {request}")
     return {"message": "Request received"}
-
 
 @app.post("/webhook")
 async def webhook(request: Request):
@@ -37,7 +47,7 @@ async def webhook(request: Request):
         else:
             memory["messages"].append(message)
 
-        manager.set_memory_dict(memory)
+        manager.set_memory_dict(memory, expire_time=3600)
 
         payload = {
             "session": "default",
@@ -51,7 +61,6 @@ async def webhook(request: Request):
     except Exception as e:
         print(f"Error processing webhook: {e}")
         return {"status": "error", "message": str(e)}
-
 
 if __name__ == "__main__":
     import uvicorn
