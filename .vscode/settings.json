@@ -1,0 +1,19 @@
+{
+    "dbcode.connections": [
+        {
+            "connectionId": "Yzcd90Sy3wvpXYZ-3wEpX",
+            "name": "Assistente",
+            "driver": "redis",
+            "color": "#FF5116",
+            "connectionType": "host",
+            "host": "localhost",
+            "port": 6380,
+            "ssl": false,
+            "username": "default",
+            "savePassword": "secretStorage",
+            "database": "0",
+            "readOnly": false,
+            "connectionTimeout": 30
+        }
+    ]
+}

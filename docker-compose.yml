@@ -21,7 +21,7 @@ services:
       - "6380:6379"
     volumes:
       - ./redisdb:/data
-    command: redis-server --save 60 1 --loglevel warning    
+    command: redis-server --save 60 1 --loglevel warning
     networks:
       - waha-network
 
@@ -35,7 +35,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
-      - ./chromadb:/api/chromadb      
+      - ./chromadb:/api/chromadb
     depends_on:
       - waha
       - redis
@@ -57,6 +57,8 @@ services:
     build:
       context: .
       dockerfile: ./app/Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379
     ports:
       - "8501:8501"
     volumes:
@@ -66,4 +68,4 @@ services:
       - redis
       - fastapi
     networks:
-      - waha-network      
+      - waha-network

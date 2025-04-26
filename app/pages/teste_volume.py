@@ -1,15 +1,20 @@
-import os
-import redis
+"""
+Test page for Redis volume functionality.
 
-import streamlit as st
+This module provides a UI for testing Redis configuration and persistence.
+"""
+
+import os
 from datetime import datetime
 
-from memory import RedisManager
+import redis
+import streamlit as st
+
+from src.memory import RedisManager
 
 # Initialize Redis client
 redis_client = redis.Redis.from_url(
-    os.getenv('REDIS_URL', 'redis://localhost:6379'),
-    decode_responses=True
+    os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
 )
 
 # Initialize config manager
@@ -24,18 +29,19 @@ if st.button("Save Configuration"):
     # Create the config data
     config_data = {
         "hello_message": hello_message,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
-    
+
     # Save to Redis
-    if config_manager.set_memory_dict(config_data):
+    try:
+        config_manager.set_memory_dict(config_data)
         st.success("Configuration saved successfully!")
-        
+
         # Display the current configuration
         st.write("Current configuration:")
         st.json(config_data)
-    else:
-        st.error("Failed to save configuration")
+    except Exception as e:
+        st.error(f"Failed to save configuration: {e}")
 
 # Add a section to view the current configuration
 st.subheader("Current Configuration")
