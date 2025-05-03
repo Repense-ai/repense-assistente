@@ -21,14 +21,8 @@ if "image_costs" not in st.session_state:
     st.session_state.image_costs = []
 if "openai_client" not in st.session_state:
     st.session_state.openai_client = None
-if "prompt_components" not in st.session_state:
-    st.session_state.prompt_components = {
-        "base_prompt": "",
-        "style": "",
-        "colors": "",
-        "lighting": "",
-        "composition": "",
-    }
+if "prompt" not in st.session_state:
+    st.session_state.prompt = ""
 
 
 def validate_file(uploaded_file: Any) -> bool:
@@ -64,24 +58,6 @@ def format_cost(cost: float) -> str:
     return f"US$ {cost:.4f}"
 
 
-def build_prompt() -> str:
-    """Constrói o prompt final com base nos componentes selecionados."""
-    components = []
-
-    if st.session_state.prompt_components["base_prompt"]:
-        components.append(st.session_state.prompt_components["base_prompt"])
-    if st.session_state.prompt_components["style"]:
-        components.append(st.session_state.prompt_components["style"])
-    if st.session_state.prompt_components["colors"]:
-        components.append(st.session_state.prompt_components["colors"])
-    if st.session_state.prompt_components["lighting"]:
-        components.append(st.session_state.prompt_components["lighting"])
-    if st.session_state.prompt_components["composition"]:
-        components.append(st.session_state.prompt_components["composition"])
-
-    return ", ".join(components)
-
-
 # Título principal
 st.title("🎨 Estúdio de Imagens")
 
@@ -92,60 +68,52 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
 )
 
-# Construtor de Prompt
-st.header("Construtor de Prompt")
+# Layout do prompt e popover
+st.header("Prompt para Geração de Imagem")
 
-# Prompt base
-col1, col2 = st.columns([3, 1])
-with col1:
-    base_prompt = st.text_area(
-        "Prompt Base",
-        value=st.session_state.prompt_components["base_prompt"],
-        help="Descreva o elemento principal da sua imagem",
+
+prompt = st.text_area(
+    "Digite seu prompt",
+    value=st.session_state.prompt,
+    height=150,
+    help="Descreva detalhadamente a imagem que você deseja gerar",
+    placeholder="Ex: Uma paisagem serena de montanhas ao pôr do sol, com cores vibrantes e estilo impressionista...",
+)
+
+st.session_state.prompt = prompt
+
+with st.popover("📝 Sugestões"):
+    # Seletor de categoria
+    category = st.radio(
+        "Escolha uma categoria:",
+        [
+            "Templates",
+            "Estilos Artísticos",
+            "Composição",
+            "Paletas de Cores",
+            "Iluminação",
+        ],
+        horizontal=True,
+        key="category_selector",
     )
-    st.session_state.prompt_components["base_prompt"] = base_prompt
 
-with col2:
-    template = st.selectbox("Usar Template", ["Nenhum", *list(IMAGE_GENERATION.keys())])
-    if template != "Nenhum":
-        st.session_state.prompt_components["base_prompt"] = IMAGE_GENERATION[template]
+    st.markdown("---")
 
-# Componentes do prompt
-st.subheader("Elementos Adicionais")
-col1, col2, col3, col4 = st.columns(4)
+    # Container com scroll para as sugestões
+    with st.container():
+        category_map = {
+            "Templates": (IMAGE_GENERATION, "🎯"),
+            "Estilos Artísticos": (ARTISTIC_STYLES, "🎨"),
+            "Composição": (COMPOSITION, "🖼️"),
+            "Paletas de Cores": (COLOR_PALETTES, "🌈"),
+            "Iluminação": (LIGHTING, "💡"),
+        }
 
-with col1:
-    style = st.selectbox("Estilo Artístico", ["Nenhum", *list(ARTISTIC_STYLES.keys())])
-    if style != "Nenhum":
-        st.session_state.prompt_components["style"] = ARTISTIC_STYLES[style]
-    else:
-        st.session_state.prompt_components["style"] = ""
-
-with col2:
-    colors = st.selectbox("Paleta de Cores", ["Nenhum", *list(COLOR_PALETTES.keys())])
-    if colors != "Nenhum":
-        st.session_state.prompt_components["colors"] = COLOR_PALETTES[colors]
-    else:
-        st.session_state.prompt_components["colors"] = ""
-
-with col3:
-    lighting = st.selectbox("Iluminação", ["Nenhum", *list(LIGHTING.keys())])
-    if lighting != "Nenhum":
-        st.session_state.prompt_components["lighting"] = LIGHTING[lighting]
-    else:
-        st.session_state.prompt_components["lighting"] = ""
-
-with col4:
-    composition = st.selectbox("Composição", ["Nenhum", *list(COMPOSITION.keys())])
-    if composition != "Nenhum":
-        st.session_state.prompt_components["composition"] = COMPOSITION[composition]
-    else:
-        st.session_state.prompt_components["composition"] = ""
-
-# Preview do prompt final
-st.subheader("Prompt Final")
-final_prompt = build_prompt()
-st.text_area("", value=final_prompt, height=100, disabled=True)
+        if category in category_map:
+            items, icon = category_map[category]
+            for name, value in items.items():
+                with st.expander(f"{icon} {name}"):
+                    st.code(value, language=None)
 
 # Formulário principal
 with st.form("image_form"):
@@ -175,7 +143,7 @@ with st.form("image_form"):
 
     submit_button = st.form_submit_button("Processar Imagem")
 
-    if submit_button and final_prompt:
+    if submit_button and prompt:
         if not st.session_state.openai_client and not initialize_openai_client():
             st.error("Falha ao inicializar o cliente OpenAI")
         else:
@@ -191,7 +159,7 @@ with st.form("image_form"):
                             ]
 
                             result = st.session_state.openai_client.edit(
-                                prompt=final_prompt,
+                                prompt=prompt,
                                 image=image_buffers,
                                 size=size,
                                 quality=quality,
@@ -205,7 +173,7 @@ with st.form("image_form"):
                             st.success("Imagem processada com sucesso!")
                     else:
                         result = st.session_state.openai_client.generate(
-                            prompt=final_prompt,
+                            prompt=prompt,
                             size=size,
                             quality=quality,
                             background=background,
