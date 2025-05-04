@@ -1,4 +1,5 @@
-from typing import Any
+import json
+import os
 
 import streamlit as st
 
@@ -23,24 +24,52 @@ if "openai_client" not in st.session_state:
     st.session_state.openai_client = None
 if "prompt" not in st.session_state:
     st.session_state.prompt = ""
+if "saved_prompts" not in st.session_state:
+    st.session_state.saved_prompts = {}
+
+# Configuração do diretório para salvar os prompts
+PROMPTS_DIR = "app/assets/saved_prompts"
+PROMPTS_FILE = os.path.join(PROMPTS_DIR, "personal_prompts.json")
+
+# Criar diretório se não existir
+os.makedirs(PROMPTS_DIR, exist_ok=True)
 
 
-def validate_file(uploaded_file: Any) -> bool:
-    """Valida os requisitos do arquivo."""
-    if uploaded_file is None:
+def load_saved_prompts() -> None:
+    """Carrega prompts salvos do arquivo."""
+    try:
+        if os.path.exists(PROMPTS_FILE):
+            with open(PROMPTS_FILE, encoding="utf-8") as f:
+                st.session_state.saved_prompts = json.load(f)
+    except Exception as e:
+        st.error(f"Erro ao carregar prompts: {e}")
+
+
+def save_prompt(name: str, prompt_text: str) -> bool:
+    """Salva um novo prompt no arquivo."""
+    try:
+        st.session_state.saved_prompts[name] = prompt_text
+        with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(st.session_state.saved_prompts, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar prompt: {e}")
         return False
 
-    file_type = uploaded_file.type.lower()
-    valid_types = ["image/png", "image/jpeg", "image/webp"]
-    if file_type not in valid_types:
-        st.error("Por favor, envie apenas arquivos PNG, JPEG ou WebP.")
-        return False
 
-    if uploaded_file.size > 25 * 1024 * 1024:
-        st.error("O arquivo deve ter menos de 25MB.")
+def delete_prompt(name: str) -> bool:
+    """Deleta um prompt salvo."""
+    try:
+        if name in st.session_state.saved_prompts:
+            del st.session_state.saved_prompts[name]
+            with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
+                json.dump(
+                    st.session_state.saved_prompts, f, ensure_ascii=False, indent=2
+                )
+        return True
+    except Exception as e:
+        st.error(f"Erro ao deletar prompt: {e}")
         return False
-
-    return True
 
 
 def initialize_openai_client() -> bool:
@@ -58,12 +87,43 @@ def format_cost(cost: float) -> str:
     return f"US$ {cost:.4f}"
 
 
+# Carrega prompts salvos ao iniciar
+load_saved_prompts()
+
+# Sidebar para gerenciar prompts salvos
+with st.sidebar:
+    st.header("Prompts Salvos")
+
+    # Seção para salvar novo prompt
+    with st.expander("💾 Salvar Prompt Atual"):
+        prompt_name = st.text_input("Nome do Prompt", key="new_prompt_name")
+        if st.button("Salvar") and prompt_name and st.session_state.prompt:
+            if save_prompt(prompt_name, st.session_state.prompt):
+                st.success(f"Prompt '{prompt_name}' salvo com sucesso!")
+
+    # Seção para carregar prompts
+    if st.session_state.saved_prompts:
+        st.markdown("### Carregar Prompt")
+        for name, saved_prompt in st.session_state.saved_prompts.items():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if st.button(f"📜 {name}", key=f"load_{name}"):
+                    st.session_state.prompt = saved_prompt
+                    st.rerun()
+            with col2:
+                if st.button("🗑️", key=f"delete_{name}"):
+                    if delete_prompt(name):
+                        st.success(f"Prompt '{name}' deletado!")
+                        st.rerun()
+
+    st.markdown("---")
+
 # Título principal
 st.title("🎨 Estúdio de Imagens")
 
 # Seção de upload
 uploaded_files = st.file_uploader(
-    "Envie imagens (PNG, JPEG ou WebP, máximo 25MB cada)",
+    "Envie até 16 imagens (PNG, JPEG ou WebP, máximo 25MB cada)",
     type=["png", "jpg", "jpeg", "webp"],
     accept_multiple_files=True,
 )
@@ -71,8 +131,7 @@ uploaded_files = st.file_uploader(
 # Layout do prompt e popover
 st.header("Prompt para Geração de Imagem")
 
-
-prompt = st.text_area(
+st.session_state.new_prompt = st.text_area(
     "Digite seu prompt",
     value=st.session_state.prompt,
     height=150,
@@ -80,7 +139,9 @@ prompt = st.text_area(
     placeholder="Ex: Uma paisagem serena de montanhas ao pôr do sol, com cores vibrantes e estilo impressionista...",
 )
 
-st.session_state.prompt = prompt
+if st.session_state.new_prompt != st.session_state.prompt:
+    st.session_state.prompt = st.session_state.new_prompt
+    st.rerun()
 
 with st.popover("📝 Sugestões"):
     # Seletor de categoria
@@ -143,23 +204,23 @@ with st.form("image_form"):
 
     submit_button = st.form_submit_button("Processar Imagem")
 
-    if submit_button and prompt:
+    if submit_button and st.session_state.prompt:
         if not st.session_state.openai_client and not initialize_openai_client():
             st.error("Falha ao inicializar o cliente OpenAI")
         else:
             with st.spinner("Processando..."):
                 try:
                     if uploaded_files:
-                        valid_files = [f for f in uploaded_files if validate_file(f)]
-                        if len(valid_files) > 16:
+                        if len(uploaded_files) > 16:
                             st.error("Máximo de 16 imagens permitido.")
-                        elif valid_files:
+                        elif uploaded_files:
                             image_buffers = [
-                                get_memory_buffer(f.read(), f.name) for f in valid_files
+                                get_memory_buffer(f.read(), f.name)
+                                for f in uploaded_files
                             ]
 
                             result = st.session_state.openai_client.edit(
-                                prompt=prompt,
+                                prompt=st.session_state.prompt,
                                 image=image_buffers,
                                 size=size,
                                 quality=quality,
@@ -173,7 +234,7 @@ with st.form("image_form"):
                             st.success("Imagem processada com sucesso!")
                     else:
                         result = st.session_state.openai_client.generate(
-                            prompt=prompt,
+                            prompt=st.session_state.prompt,
                             size=size,
                             quality=quality,
                             background=background,
