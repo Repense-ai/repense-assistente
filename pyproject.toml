@@ -72,7 +72,7 @@ exclude = [
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "B", "C4", "UP", "ANN", "RUF"]
-ignore = ["E501", "ANN401", "ANN101"]
+ignore = ["E501", "ANN401", "ANN101", "ANN204"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["repense_assistente"]

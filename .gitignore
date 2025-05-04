@@ -176,3 +176,7 @@ cython_debug/
 # Databases
 chromadb/
 redisdb/
+
+# App personal files
+app/assets/saved_prompts/*
+app/assets/config/*

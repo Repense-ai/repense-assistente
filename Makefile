@@ -7,3 +7,6 @@ lint:
 
 pre-commit:
 	uv run pre-commit run --all-files
+
+streamlit:
+	streamlit run app/Repense.py
