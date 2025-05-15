@@ -8,4 +8,4 @@ RUN pip install --upgrade pip && \
 
 EXPOSE 8501
 
-CMD ["uv", "run", "streamlit", "run", "./app/home.py"]
+CMD ["uv", "run", "streamlit", "run", "./app/Repense.py"]

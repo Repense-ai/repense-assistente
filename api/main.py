@@ -6,11 +6,14 @@ This module provides endpoints for webhook processing and configuration manageme
 
 import logging
 import os
+from datetime import datetime
 
 import redis
 import requests
 from fastapi import FastAPI, Request
+from openai import OpenAI
 
+from app.prompts.atendimento import PROMPT_ASSISTENTE
 from src.memory import RedisManager
 
 logging.getLogger("uvicorn.access").addFilter(
@@ -75,29 +78,66 @@ async def webhook(request: Request) -> dict:
         print(body)
 
         if body["event"] == "message":
-
+            # Extract message data
             phone = body["payload"]["from"]
-            message = body["payload"]["body"]
+            message_content = body["payload"]["body"]
 
-            manager = RedisManager(redis_client, phone)
-            memory = manager.get_memory_dict()
+            # Get configuration
+            config_manager = RedisManager(redis_client, "config")
+            config = config_manager.get_memory_dict()
 
-            if not memory:
-                memory = {"messages": [message]}
+            # Initialize chat manager for this user
+            chat_manager = RedisManager(redis_client, f"chat:{phone}")
+            stored_messages = chat_manager.get_memory_dict()
+
+            # Initialize or load message history
+            if not stored_messages or "messages" not in stored_messages:
+                messages = [
+                    {"role": "system", "content": PROMPT_ASSISTENTE.format(**config)}
+                ]
             else:
-                memory["messages"].append(message)
+                messages = stored_messages["messages"]
 
-            manager.set_memory_dict(memory, expire_time=3600)
+            # Add user message
+            messages.append({"role": "user", "content": message_content})
 
-            payload = {
-                "session": "default",
-                "chatId": phone,
-                "text": str(memory["messages"]),
-                "linkPreview": False,
-            }
+            # Get assistant response
+            try:
+                client = OpenAI()
+                response = client.chat.completions.create(
+                    model="gpt-4.1",
+                    messages=messages,
+                    temperature=0.7,
+                )
 
-            requests.post("http://waha:3000/api/sendText", json=payload)
-            return {"status": "success"}
+                assistant_message = response.choices[0].message.content
+
+                # Add assistant response to history
+                messages.append({"role": "assistant", "content": assistant_message})
+
+                # Save updated chat history
+                chat_manager.set_memory_dict(
+                    {"messages": messages, "last_updated": datetime.now().isoformat()},
+                    expire_time=3600,
+                )  # 1 hour expiration
+
+                # Send response back to WhatsApp
+                payload = {
+                    "session": "default",
+                    "chatId": phone,
+                    "text": assistant_message,
+                    "linkPreview": False,
+                }
+
+                requests.post("http://waha:3000/api/sendText", json=payload)
+                return {"status": "success"}
+
+            except Exception as e:
+                print(f"Error getting assistant response: {e}")
+                return {"status": "error", "message": str(e)}
+
+        return {"status": "success", "message": "Non-message event ignored"}
+
     except Exception as e:
         print(f"Error processing webhook: {e}")
         return {"status": "error", "message": str(e)}
