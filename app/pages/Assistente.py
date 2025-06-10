@@ -30,44 +30,43 @@ except redis.exceptions.ConnectionError as e:
     st.error(f"Não foi possível conectar ao Redis. Verifique se os serviços estão rodando. Detalhes: {e}")
     st.stop()
 
-# Initialize OpenAI client
-config_manager = RedisManager(redis_client, "config")
-# Safely get config, default to an empty dict if it doesn't exist
-config = config_manager.get_memory_dict() or {} 
-api_key = config.get("OPENAI_API_KEY")
+# --- API Key and Client Initialization ---
+openai_api_key_manager = RedisManager(redis_client, "secrets:openai_api_key")
+api_key = openai_api_key_manager.get_memory_dict().get('key')
 
 if not api_key:
-    st.warning("⚠️ A chave de API da OpenAI não foi configurada.")
-    st.info("Por favor, vá para a página de configurações para adicionar sua chave.")
+    st.warning("⚠️ A chave da API da OpenAI não foi configurada.")
     if st.button("Ir para Configurações"):
         st.switch_page("pages/Configurações.py")
     st.stop()
 
 try:
     client = OpenAI(api_key=api_key)
-    # Test the key with a lightweight call
-    client.models.list()
+    client.models.list()  # Test the key
 except Exception as e:
     st.error(f"A chave de API configurada é inválida ou expirou. Por favor, atualize-a na página de configurações. Erro: {e}")
     if st.button("Ir para Configurações"):
         st.switch_page("pages/Configurações.py")
     st.stop()
 
+# Initialize config manager
+config_manager = RedisManager(redis_client, "config")
+config = config_manager.get_memory_dict()
+
 # Initialize Redis manager for persistent chat history
 chat_manager = RedisManager(redis_client, "chat_history")
 stored_messages = chat_manager.get_memory_dict()
 
-# Provide defaults for prompt formatting to avoid errors if config is partial
-prompt_defaults = {
-    "business_name": "a empresa",
-    "business_description": "Não há descrição do negócio.",
-    "assistant_name": "Assistente",
-    "tone": "profissional",
-    "use_emojis": "Não",
-    "instructions": "Nenhuma instrução adicional.",
-}
-# Merge defaults with actual config
-prompt_config = {**prompt_defaults, **config}
+if not config:
+    config = {
+        "business_name": "",
+        "business_description": "",
+        "business_segment": "",
+        "assistant_name": "",
+        "tone": "",
+        "use_emojis": "",
+        "instructions": "",
+    }    
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
@@ -76,7 +75,7 @@ if "messages" not in st.session_state:
         st.session_state.messages = stored_messages["messages"]
     else:
         st.session_state.messages = [
-            {"role": "system", "content": PROMPT_ASSISTENTE.format(**prompt_config)},
+            {"role": "system", "content": PROMPT_ASSISTENTE.format(**config)},
         ]
 
 # Chat interface header

@@ -13,169 +13,144 @@ import streamlit as st
 
 from src.memory import RedisManager
 
-# Functions
+# --- Utility Functions ---
 
+def show_notification(message, type='info'):
+    """Displays a notification message in the UI."""
+    if type == 'success':
+        st.success(message)
+    elif type == 'warning':
+        st.warning(message)
+    elif type == 'error':
+        st.error(message)
+    else:
+        st.info(message)
 
 def validate_api_key(api_key: str) -> bool:
-    """
-    Validate if the provided API key is valid.
-
-    Args:
-        api_key (str): The OpenAI API key to validate
-
-    Returns:
-        bool: True if key is valid, False otherwise
-    """
-    if not api_key:
+    """Validates the OpenAI API key."""
+    if not api_key or not api_key.strip():
         return False
     try:
-        api_key = api_key.strip()
-        client = openai.OpenAI(api_key=api_key)
-        # Make a simple API call to test the key
-        _ = client.models.list()
+        client = openai.OpenAI(api_key=api_key.strip())
+        client.models.list()
         return True
-    except Exception as e:
-        st.error(f"API key validation failed: {e!s}")
+    except Exception:
         return False
 
+# --- Initialization ---
 
-# Initialize Redis client
-redis_client = redis.Redis.from_url(
-    os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
-)
+st.set_page_config(page_title="Repense.ai - Configurações", page_icon="⚙️", layout="wide")
 
-# Initialize config manager
-config_manager = RedisManager(redis_client, "config")
+try:
+    redis_client = redis.Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True)
+    config_manager = RedisManager(redis_client, "config")
+    openai_api_key_manager = RedisManager(redis_client, "secrets:openai_api_key")
+except redis.exceptions.ConnectionError as e:
+    st.error(f"Não foi possível conectar ao Redis. Verifique se os serviços estão rodando. Detalhes: {e}")
+    st.stop()
 
-# Load existing configuration
-current_config = config_manager.get_memory_dict() or {}
-if "validated_api_key" not in st.session_state:
-    st.session_state.validated_api_key = None
+# Load existing data
+current_config = config_manager.get_memory_dict()
+api_key_persisted = openai_api_key_manager.get_memory_dict().get('key')
 
-# Configure page
-st.set_page_config(
-    page_title="Repense.ai - Assistente", page_icon="🤖", layout="centered"
-)
+# --- UI Rendering ---
 
-# API Key Management
-st.header("Configuração da API OpenAI")
+st.title("Configurações Gerais")
+st.write("Gerencie as configurações do seu assistente virtual e da API da OpenAI.")
 
-existing_key = current_config.get("OPENAI_API_KEY")
+# --- OpenAI API Key Management ---
+st.header("Chave da API OpenAI")
+notification_placeholder = st.empty()
 
-if existing_key:
-    st.success("✅ API Key da OpenAI já está configurada!")
-else:
-    st.warning(
-        "⚠️ API Key da OpenAI não está configurada. Por favor, configure-a abaixo."
+with st.container():
+    api_key_input = st.text_input(
+        "Insira sua chave da API da OpenAI",
+        type="password",
+        placeholder="sk-...",
+        help="Sua chave é armazenada de forma segura e não é compartilhada."
     )
 
-api_key_input = st.text_input(
-    "Digite sua API Key da OpenAI para validar ou atualizar",
-    type="password",
-    help="Você pode obter sua API key em: https://platform.openai.com/api-keys",
-)
+    if st.button("Salvar/Atualizar Chave da OpenAI"):
+        if validate_api_key(api_key_input):
+            key = api_key_input.strip()
+            openai_api_key_manager.set_memory_dict({'key': key})
+            with notification_placeholder.container():
+                show_notification("✅ Chave da API da OpenAI salva com sucesso!", 'success')
+            st.rerun()
+        else:
+            with notification_placeholder.container():
+                show_notification("❌ Chave da API inválida. Verifique e tente novamente.", 'error')
 
-if st.button("Validar e Salvar Chave Temporariamente"):
-    if validate_api_key(api_key_input):
-        st.session_state.validated_api_key = api_key_input
-        st.success("✅ API Key validada e pronta para ser salva com as configurações.")
-    else:
-        st.error("❌ API Key inválida. Por favor, verifique e tente novamente.")
+if not api_key_persisted:
+    with notification_placeholder.container():
+        show_notification(
+            "⚠️ A chave da API da OpenAI não está configurada.",
+            'warning'
+        )
+else:
+    with notification_placeholder.container():
+        show_notification(
+            "✅ A chave da API da OpenAI está configurada.",
+            'success'
+        )
 
 st.divider()
 
-st.title("Configuração do Assistente Virtual")
+# --- Assistant Configuration ---
+st.header("Configuração do Assistente")
 
-with st.form("assistant_config"):
-    # Informações do Negócio
+with st.form("assistant_config_form"):
     st.subheader("Informações do Negócio")
-    business_name = st.text_input(
-        "Nome da Empresa",
-        value=current_config.get("business_name", ""),
-        help="Nome da sua empresa",
-    )
-
-    business_description = st.text_area(
-        "Descrição do Negócio",
-        value=current_config.get("business_description", ""),
-        help="Descreva brevemente o que sua empresa faz",
-        height=100,
-    )
-
+    business_name = st.text_input("Nome da Empresa", value=current_config.get("business_name", ""))
+    business_description = st.text_area("Descrição do Negócio", value=current_config.get("business_description", ""), height=100)
     business_segment = st.selectbox(
         "Segmento",
-        options=["Varejo", "Serviços", "Tecnologia", "Saúde", "Educação", "Outro"],
-        index=["Varejo", "Serviços", "Tecnologia", "Saúde", "Educação", "Outro"].index(
-            current_config.get("business_segment", "Varejo")
-        ),
+        ["Varejo", "Serviços", "Tecnologia", "Saúde", "Educação", "Outro"],
+        index=["Varejo", "Serviços", "Tecnologia", "Saúde", "Educação", "Outro"].index(current_config.get("business_segment", "Varejo"))
     )
 
-    # Configuração da Personalidade do Assistente
     st.subheader("Personalidade do Assistente")
-
-    assistant_name = st.text_input(
-        "Nome do Assistente",
-        value=current_config.get("assistant_name", ""),
-        help="Como seu assistente virtual deve se apresentar",
-    )
-
-    tone_options = {
-        "profissional": "Profissional e Formal",
-        "amigável": "Amigável e Informal",
-        "casual": "Casual e Descontraído",
-        "entusiasmado": "Entusiasmado e Energético",
-    }
-
+    assistant_name = st.text_input("Nome do Assistente", value=current_config.get("assistant_name", ""))
     tone = st.select_slider(
         "Tom de Voz",
-        options=list(tone_options.keys()),
-        value=current_config.get("tone", "profissional"),
-        format_func=lambda x: tone_options[x],
+        options=["profissional", "amigável", "casual", "entusiasmado"],
+        value=current_config.get("tone", "profissional")
     )
+    use_emojis = st.toggle("Usar Emojis", value=current_config.get("use_emojis", True))
+    instructions = st.text_area("Instruções Adicionais", value=current_config.get("instructions", ""), height=100)
 
-    use_emojis = st.toggle(
-        "Usar Emojis nas Respostas",
-        value=current_config.get("use_emojis", True),
-        help="Permite que o assistente use emojis em suas respostas",
-    )
+    submit_button = st.form_submit_button("Salvar Configurações do Assistente", use_container_width=True)
 
-    instructions = st.text_area(
-        "Instruções Adicionais",
-        value=current_config.get("instructions", ""),
-        help="Instruções adicionais para o assistente",
-        height=100,
-    )
-
-    # Botão de Salvar
-    submitted = st.form_submit_button("Salvar Configurações")
-
-    if submitted:
-        config_data = {
-            "business_name": business_name,
-            "business_description": business_description,
-            "business_segment": business_segment,
-            "assistant_name": assistant_name,
-            "tone": tone,
-            "use_emojis": use_emojis,
-            "instructions": instructions,
-            "last_updated": datetime.now().isoformat(),
-        }
-
-        # Use the newly validated key from session state, or fall back to existing key
-        if st.session_state.validated_api_key:
-            config_data["OPENAI_API_KEY"] = st.session_state.validated_api_key
-        elif existing_key:
-            config_data["OPENAI_API_KEY"] = existing_key
+    if submit_button:
+        if not api_key_persisted:
+            show_notification("❌ Por favor, salve uma chave da API da OpenAI válida antes de salvar as configurações.", 'error')
         else:
-            st.error(
-                "Nenhuma chave API da OpenAI foi configurada. Valide uma chave antes de salvar."
-            )
-            st.stop()
+            config_data = {
+                "business_name": business_name,
+                "business_description": business_description,
+                "business_segment": business_segment,
+                "assistant_name": assistant_name,
+                "tone": tone,
+                "use_emojis": use_emojis,
+                "instructions": instructions,
+                "last_updated": datetime.now().isoformat(),
+            }
+            try:
+                config_manager.set_memory_dict(config_data)
+                show_notification("✅ Configurações do assistente salvas com sucesso!", 'success')
+            except Exception as e:
+                show_notification(f"❌ Erro ao salvar as configurações: {e}", 'error')
 
-        try:
-            config_manager.set_memory_dict(config_data)
-            st.success("✅ Configurações salvas com sucesso!")
-            # Clear the temporary key from session state after saving
-            st.session_state.validated_api_key = None
-        except Exception as e:
-            st.error(f"❌ Erro ao salvar configurações: {e}")
+st.divider()
+
+# --- Actions ---
+st.header("Ações")
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("Ir para o Assistente", use_container_width=True, type="primary"):
+        st.switch_page("pages/Assistente.py")
+
+with col2:
+    if st.button("Configurar WhatsApp", use_container_width=True):
+        st.info("Esta funcionalidade ainda não foi implementada.") # Placeholder

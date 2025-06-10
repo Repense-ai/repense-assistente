@@ -29,15 +29,12 @@ except redis.exceptions.ConnectionError as e:
     )
     st.stop()
 
-# Initialize OpenAI client
-config_manager = RedisManager(redis_client, "config")
-# Safely get config, default to an empty dict if it doesn't exist
-config = config_manager.get_memory_dict() or {}
-api_key = config.get("OPENAI_API_KEY")
+# --- API Key and Client Initialization ---
+openai_api_key_manager = RedisManager(redis_client, "secrets:openai_api_key")
+api_key = openai_api_key_manager.get_memory_dict().get('key')
 
 if not api_key:
-    st.warning("⚠️ A chave de API da OpenAI não foi configurada.")
-    st.info("Por favor, vá para a página de configurações para adicionar sua chave.")
+    st.warning("⚠️ A chave da API da OpenAI não foi configurada.")
     if st.button("Ir para Configurações"):
         st.switch_page("pages/Configurações.py")
     st.stop()
@@ -53,6 +50,10 @@ if "openai_client" not in st.session_state:
         if st.button("Ir para Configurações"):
             st.switch_page("pages/Configurações.py")
         st.stop()
+
+# Initialize config manager
+config_manager = RedisManager(redis_client, "config")
+config = config_manager.get_memory_dict()
 
 # Initialize Redis Manager for saved prompts
 prompts_manager = RedisManager(redis_client, "saved_prompts")
