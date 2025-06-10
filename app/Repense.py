@@ -37,24 +37,3 @@ st.divider()
 
 if st.button("Começar"):
     st.switch_page("pages/Configurações.py")
-
-
-def get_app_version():
-    """Reads the version from the VERSION file."""
-    try:
-        # The VERSION file is in the same directory as this script
-        version_file = Path(__file__).parent / "VERSION"
-        return version_file.read_text().strip()
-    except FileNotFoundError:
-        return "N/A"
-
-
-with st.sidebar:
-    st.page_link("pages/Assistente.py", label="Assistente Virtual", icon="🤖")
-    st.page_link("pages/Imagens.py", label="Estúdio de Imagens", icon="🎨")
-    st.page_link("pages/Configurações.py", label="Configurações", icon="⚙️")
-    st.info(
-        "Certifique-se de que sua chave de API da OpenAI esteja configurada para usar os assistentes."
-    )
-    st.markdown("---")
-    st.markdown(f"Versão: `{get_app_version()}`")
