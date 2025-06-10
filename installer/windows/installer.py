@@ -32,7 +32,7 @@ class RepensenAssistenteInstaller:
             f"https://api.github.com/repos/{self.github_repo}/releases/latest"
         )
         self.github_download_url = (
-            f"https://github.com/{self.github_repo}/archive/refs/heads/feat/windows-installer.zip"
+            f"https://github.com/{self.github_repo}/archive/refs/heads/main.zip"
         )
 
         # Conexão com Redis
