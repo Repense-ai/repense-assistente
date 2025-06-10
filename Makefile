@@ -1,7 +1,4 @@
-GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
-
 build:
-	echo $(GIT_COMMIT) > app/VERSION
 	docker-compose build
 
 up:
@@ -11,7 +8,6 @@ down:
 	docker-compose down
 
 run:
-	echo $(GIT_COMMIT) > app/VERSION
 	docker-compose up --build
 
 lint:

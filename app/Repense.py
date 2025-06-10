@@ -41,10 +41,12 @@ if st.button("Começar"):
 
 def get_app_version():
     """Reads the version from the VERSION file."""
-    version_file = Path(__file__).parent / "VERSION"
-    if version_file.exists():
+    try:
+        # The VERSION file is in the same directory as this script
+        version_file = Path(__file__).parent / "VERSION"
         return version_file.read_text().strip()
-    return os.getenv("APP_VERSION", "dev")
+    except FileNotFoundError:
+        return "N/A"
 
 
 with st.sidebar:

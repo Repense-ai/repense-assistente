@@ -2,10 +2,6 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Set the application version from the VERSION file
-COPY VERSION /app/
-RUN echo "APP_VERSION=$(cat /app/VERSION)" >> /etc/environment
-
 # Copy dependency files and install dependencies first
 COPY pyproject.toml uv.lock ./
 RUN pip install --upgrade pip && \
@@ -13,6 +9,7 @@ RUN pip install --upgrade pip && \
     uv sync --frozen --no-install-project --no-dev
 
 # Copy the rest of the application code
+# This will include the VERSION file
 COPY ./app .
 
 EXPOSE 8501
