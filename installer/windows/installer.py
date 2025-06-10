@@ -10,19 +10,19 @@ import webbrowser
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from tkinter import messagebox, scrolledtext, ttk
+from tkinter import messagebox, scrolledtext, simpledialog, ttk
 from typing import Any
 
 import requests
+import redis
 
 
 class RepensenAssistenteInstaller:
     def __init__(self):
         self.app_name = "Repense Assistente"
         self.version = "1.0.0"
-        self.github_repo = (
-            "seu-usuario/repense-assistente"  # Substitua pelo seu repositório
-        )
+        # O repositório GitHub é usado para verificar atualizações.
+        self.github_repo = "Repense-ai/repense-assistente"
         self.install_dir = Path.home() / "RepensenAssistente"
         self.config_file = self.install_dir / "config.json"
         self.docker_compose_file = self.install_dir / "docker-compose.yml"
@@ -34,6 +34,9 @@ class RepensenAssistenteInstaller:
         self.github_download_url = (
             f"https://github.com/{self.github_repo}/archive/refs/heads/main.zip"
         )
+
+        # Conexão com Redis
+        self.redis_client = None
 
         # Interface gráfica
         self.root = None
@@ -98,6 +101,14 @@ class RepensenAssistenteInstaller:
             button_frame, text="Instalar/Atualizar", command=self.install_or_update
         )
         self.install_btn.pack(side=tk.LEFT, padx=5)
+
+        self.config_btn = ttk.Button(
+            button_frame,
+            text="Configurar",
+            command=self.configure_api_key,
+            state=tk.DISABLED,
+        )
+        self.config_btn.pack(side=tk.LEFT, padx=5)
 
         self.start_btn = ttk.Button(
             button_frame,
@@ -318,6 +329,12 @@ class RepensenAssistenteInstaller:
                 # Criar diretório de instalação
                 self.install_dir.mkdir(parents=True, exist_ok=True)
 
+                # Remover arquivo .env se existir de uma instalação antiga
+                old_env_file = self.install_dir / ".env"
+                if old_env_file.exists():
+                    self.log("Removendo arquivo .env antigo...")
+                    old_env_file.unlink()
+
                 # Copiar arquivos
                 self.log("Copiando arquivos para diretório de instalação...")
                 for item in source_dir.iterdir():
@@ -338,31 +355,54 @@ class RepensenAssistenteInstaller:
             self.log(f"Erro ao baixar/extrair arquivos: {e!s}")
             return False
 
-    def create_env_file(self):
-        """Cria arquivo .env com configurações padrão"""
-        env_file = self.install_dir / ".env"
+    def connect_to_redis(self):
+        """Tenta conectar ao Redis"""
+        try:
+            self.log("Conectando ao Redis em localhost:6379...")
+            self.redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+            # Testar a conexão
+            self.redis_client.ping()
+            self.log("Conexão com Redis bem-sucedida.")
+            return True
+        except redis.exceptions.ConnectionError as e:
+            self.log(f"Falha ao conectar ao Redis: {e}")
+            self.redis_client = None
+            return False
 
-        if not env_file.exists():
-            self.log("Criando arquivo de configuração...")
+    def configure_api_key(self):
+        """Abre um diálogo para o usuário inserir a chave de API e a salva no Redis"""
+        if not self.is_running:
+            messagebox.showwarning("Aviso", "Os serviços precisam estar em execução para configurar a chave de API.")
+            return
 
-            env_content = """# Configurações do Repense Assistente
-OPENAI_API_KEY=your_openai_api_key_here
-REDIS_URL=redis://redis:6379
+        if not self.redis_client:
+            if not self.connect_to_redis():
+                 messagebox.showerror("Erro", "Não foi possível conectar ao Redis. Verifique se os serviços estão rodando corretamente.")
+                 return
 
-# Configurações do WAHA
-WAHA_PRINT_QR=false
-TZ=America/Sao_Paulo
+        # Obter chave atual para exibir no prompt
+        try:
+            current_key = self.redis_client.get("OPENAI_API_KEY") or ""
+        except Exception as e:
+            self.log(f"Erro ao obter a chave atual do Redis: {e}")
+            current_key = ""
+        
+        new_key = simpledialog.askstring(
+            "Configurar Chave de API",
+            "Insira sua OpenAI API Key:",
+            initialvalue=current_key,
+            parent=self.root,
+        )
 
-# Configurações do ambiente
-ENVIRONMENT=production
-"""
-
-            with open(env_file, "w", encoding="utf-8") as f:
-                f.write(env_content)
-
-            self.log(
-                "Arquivo .env criado. Configure suas chaves de API antes de iniciar."
-            )
+        if new_key:
+            try:
+                self.log("Salvando a chave de API no Redis...")
+                self.redis_client.set("OPENAI_API_KEY", new_key)
+                self.log("Chave de API salva com sucesso!")
+                messagebox.showinfo("Sucesso", "A chave de API foi salva com sucesso no Redis.")
+            except Exception as e:
+                self.log(f"Erro ao salvar a chave no Redis: {e}")
+                messagebox.showerror("Erro", f"Ocorreu um erro ao salvar a chave: {e}")
 
     def save_config(self):
         """Salva configurações do instalador"""
@@ -413,11 +453,7 @@ ENVIRONMENT=production
 
                 # Baixar e instalar
                 if self.download_and_extract():
-                    self.update_progress(80)
-
-                    # Criar arquivo .env
-                    self.create_env_file()
-                    self.update_progress(90)
+                    self.update_progress(95)
 
                     # Salvar configurações
                     self.save_config()
@@ -428,12 +464,14 @@ ENVIRONMENT=production
 
                     # Habilitar botões
                     self.start_btn.config(state=tk.NORMAL)
-                    self.open_btn.config(state=tk.NORMAL)
                     self.rebuild_btn.config(state=tk.NORMAL)
+                    
+                    # Manter o botão de configurar desabilitado até os serviços iniciarem
+                    self.config_btn.config(state=tk.DISABLED)
 
                     messagebox.showinfo(
                         "Sucesso",
-                        "Instalação concluída! Configure o arquivo .env antes de iniciar.",
+                        "Instalação concluída! Inicie os serviços e depois configure a chave de API.",
                     )
                 else:
                     self.update_status("Erro na instalação")
@@ -509,44 +547,52 @@ ENVIRONMENT=production
         threading.Thread(target=run_rebuild, daemon=True).start()
 
     def start_services(self):
-        """Inicia os serviços Docker"""
+        """Inicia os serviços Docker e transmite o output."""
 
         def run_start():
             try:
                 self.start_btn.config(state=tk.DISABLED)
+                self.stop_btn.config(state=tk.DISABLED)
                 self.update_status("Iniciando serviços...")
+                self.log("Executando 'docker compose up -d'...")
 
-                os.chdir(self.install_dir)
-
-                self.log("Iniciando containers Docker...")
-                result = subprocess.run(
+                process = subprocess.Popen(
                     ["docker", "compose", "up", "-d"],
-                    capture_output=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
                     text=True,
                     cwd=self.install_dir,
+                    encoding="utf-8",
+                    errors="replace",
                 )
 
-                if result.returncode == 0:
+                while True:
+                    line = process.stdout.readline()
+                    if not line:
+                        break
+                    self.log(line.strip())
+                
+                process.wait()
+
+                if process.returncode == 0:
                     self.log("Serviços iniciados com sucesso!")
-                    self.log(result.stdout)
                     self.update_status("Serviços em execução")
                     self.is_running = True
 
                     self.stop_btn.config(state=tk.NORMAL)
                     self.open_btn.config(state=tk.NORMAL)
                     self.rebuild_btn.config(state=tk.NORMAL)
+                    self.config_btn.config(state=tk.NORMAL)
 
-                    # Aguardar um pouco para os serviços iniciarem
+                    self.connect_to_redis()
                     time.sleep(5)
                     self.check_services_status()
-
                 else:
-                    self.log(f"Erro ao iniciar serviços: {result.stderr}")
+                    self.log(f"Erro ao iniciar serviços (código de saída: {process.returncode}).")
                     self.update_status("Erro ao iniciar")
                     messagebox.showerror(
-                        "Erro", f"Erro ao iniciar serviços:\n{result.stderr}"
+                        "Erro", "Ocorreu um erro ao iniciar os serviços Docker. Verifique o log para detalhes."
                     )
-
             except Exception as e:
                 self.log(f"Erro ao iniciar serviços: {e!s}")
                 self.update_status("Erro ao iniciar")
@@ -566,7 +612,7 @@ ENVIRONMENT=production
 
                 self.log("Parando containers Docker...")
                 result = subprocess.run(
-                    ["docker", "compose", "down"],
+                    ["docker", "compose", "down"],        
                     capture_output=True,
                     text=True,
                     cwd=self.install_dir,
@@ -580,6 +626,7 @@ ENVIRONMENT=production
                     self.start_btn.config(state=tk.NORMAL)
                     self.open_btn.config(state=tk.DISABLED)
                     self.rebuild_btn.config(state=tk.NORMAL)
+                    self.config_btn.config(state=tk.DISABLED)
 
                 else:
                     self.log(f"Erro ao parar serviços: {result.stderr}")
@@ -605,17 +652,28 @@ ENVIRONMENT=production
                 capture_output=True,
                 text=True,
                 cwd=self.install_dir,
+                encoding="utf-8",
             )
 
             if result.returncode == 0 and result.stdout.strip():
                 services = []
+                # Docker pode retornar um stream de JSONs (um por linha) ou um único array JSON.
+                # Este código lida com ambos os casos.
                 for line in result.stdout.strip().split("\n"):
-                    if line.strip():
-                        try:
-                            service = json.loads(line)
-                            services.append(service)
-                        except:
-                            pass
+                    if not line.strip():
+                        continue
+                    try:
+                        parsed_line = json.loads(line)
+                        if isinstance(parsed_line, list):
+                            services.extend(parsed_line)  # Adiciona todos os itens de uma lista
+                        elif isinstance(parsed_line, dict):
+                            services.append(parsed_line)   # Adiciona um único dict
+                    except json.JSONDecodeError:
+                        self.log(f"Aviso: Não foi possível decodificar a linha JSON: {line}")
+
+                if not services:
+                    self.log("Nenhum serviço encontrado.")
+                    return
 
                 running_services = [s for s in services if s.get("State") == "running"]
                 self.log(
@@ -623,9 +681,9 @@ ENVIRONMENT=production
                 )
 
                 for service in services:
-                    name = service.get("Service", "unknown")
+                    name = service.get("Service", service.get("Name", "unknown"))
                     state = service.get("State", "unknown")
-                    self.log(f"  {name}: {state}")
+                    self.log(f"  - {name}: {state}")
 
         except Exception as e:
             self.log(f"Erro ao verificar status dos serviços: {e!s}")
@@ -698,7 +756,9 @@ ENVIRONMENT=production
                     self.stop_btn.config(state=tk.NORMAL)
                     self.open_btn.config(state=tk.NORMAL)
                     self.rebuild_btn.config(state=tk.NORMAL)
+                    self.config_btn.config(state=tk.NORMAL)
                     self.check_services_status()
+                    self.connect_to_redis()
 
             except:
                 pass

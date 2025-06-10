@@ -21,30 +21,63 @@ st.set_page_config(
 )
 
 # Initialize Redis client
-redis_client = redis.Redis.from_url(
-    os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
-)
+try:
+    redis_client = redis.Redis.from_url(
+        os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
+    )
+    redis_client.ping()  # Check connection
+except redis.exceptions.ConnectionError as e:
+    st.error(f"Não foi possível conectar ao Redis. Verifique se os serviços estão rodando. Detalhes: {e}")
+    st.stop()
 
 # Initialize OpenAI client
-client = OpenAI()
+config_manager = RedisManager(redis_client, "config")
+# Safely get config, default to an empty dict if it doesn't exist
+config = config_manager.get_memory_dict() or {} 
+api_key = config.get("OPENAI_API_KEY")
+
+if not api_key:
+    st.warning("⚠️ A chave de API da OpenAI não foi configurada.")
+    st.info("Por favor, vá para a página de configurações para adicionar sua chave.")
+    if st.button("Ir para Configurações"):
+        st.switch_page("pages/Configurações.py")
+    st.stop()
+
+try:
+    client = OpenAI(api_key=api_key)
+    # Test the key with a lightweight call
+    client.models.list()
+except Exception as e:
+    st.error(f"A chave de API configurada é inválida ou expirou. Por favor, atualize-a na página de configurações. Erro: {e}")
+    if st.button("Ir para Configurações"):
+        st.switch_page("pages/Configurações.py")
+    st.stop()
 
 # Initialize Redis manager for persistent chat history
 chat_manager = RedisManager(redis_client, "chat_history")
-config_manager = RedisManager(redis_client, "config")
-
 stored_messages = chat_manager.get_memory_dict()
-config = config_manager.get_memory_dict()
+
+# Provide defaults for prompt formatting to avoid errors if config is partial
+prompt_defaults = {
+    "business_name": "a empresa",
+    "business_description": "Não há descrição do negócio.",
+    "assistant_name": "Assistente",
+    "tone": "profissional",
+    "use_emojis": "Não",
+    "instructions": "Nenhuma instrução adicional.",
+}
+# Merge defaults with actual config
+prompt_config = {**prompt_defaults, **config}
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "system", "content": PROMPT_ASSISTENTE.format(**config)},
-    ]
-
-# Load stored messages into session state if available
-if stored_messages and "messages" in stored_messages:
-    if not st.session_state.messages:  # Only load if session is empty
+    # Load from Redis if available, otherwise start fresh
+    if stored_messages and "messages" in stored_messages:
         st.session_state.messages = stored_messages["messages"]
+    else:
+        st.session_state.messages = [
+            {"role": "system", "content": PROMPT_ASSISTENTE.format(**prompt_config)},
+        ]
 
 # Chat interface header
 st.header("💬 Assistente Virtual")
@@ -75,16 +108,16 @@ if prompt := st.chat_input("Digite sua mensagem..."):
         # Get assistant response
         try:
             # Create the messages list for the API call
-            messages = [
+            messages_for_api = [
                 {"role": m["role"], "content": m["content"]}
                 for m in st.session_state.messages
             ]
 
             # Make API call
             response = client.chat.completions.create(
-                model="gpt-4.1",  # Using the latest model
-                messages=messages,
-                stream=True,  # Enable streaming
+                model="gpt-4.1",  # Recommended model
+                messages=messages_for_api,
+                stream=True,
                 temperature=0.7,
             )
 
@@ -111,7 +144,7 @@ if prompt := st.chat_input("Digite sua mensagem..."):
             )
 
         except Exception as e:
-            st.error(f"Error: {e!s}")
+            st.error(f"Ocorreu um erro ao comunicar com a OpenAI: {e}")
 
 # Sidebar with chat controls
 with st.sidebar:
@@ -126,7 +159,7 @@ with st.sidebar:
     # Download chat history
     if st.session_state.messages:
         chat_text = "\n\n".join(
-            [f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages]
+            [f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages if m['role'] != 'system']
         )
 
         st.download_button(

@@ -1,61 +1,42 @@
 @echo off
+setlocal
+
+REM Get the directory of this script
+set "SCRIPT_DIR=%~dp0"
+
 echo ===================================
 echo  Build do Instalador Windows
 echo  Repense Assistente
 echo ===================================
 echo.
 
-REM Verificar se Python está instalado
+REM Check for Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo ERRO: Python não encontrado!
-    echo Instale o Python 3.8+ antes de continuar.
+    echo [ERROR] Python is not installed or not in PATH.
+    echo Please install Python 3.8+ and add it to your PATH.
     pause
     exit /b 1
 )
 
-echo Python encontrado!
+echo [INFO] Found Python installation.
 echo.
 
-REM Instalar dependências
-echo Instalando dependências...
-pip install pyinstaller requests pathlib
+REM Run the main build script
+python "%SCRIPT_DIR%build.py"
 
+REM Check the exit code of the Python script
 if errorlevel 1 (
-    echo ERRO: Falha ao instalar dependências!
-    pause
-    exit /b 1
-)
-
-echo.
-echo Compilando instalador...
-
-REM Compilar usando PyInstaller
-pyinstaller installer.spec
-
-if errorlevel 1 (
-    echo ERRO: Falha na compilação!
+    echo.
+    echo [ERROR] The build script failed.
     pause
     exit /b 1
 )
 
 echo.
 echo ===================================
-echo  Build concluído com sucesso!
+echo  Build process finished.
 echo ===================================
 echo.
-echo O instalador foi criado em: dist\RepensenAssistente-Installer.exe
-echo.
 
-REM Verificar se o arquivo foi criado
-if exist "dist\RepensenAssistente-Installer.exe" (
-    echo Arquivo criado com sucesso!
-    echo Tamanho:
-    dir "dist\RepensenAssistente-Installer.exe" | find "RepensenAssistente-Installer.exe"
-) else (
-    echo AVISO: Arquivo executável não encontrado!
-)
-
-echo.
-echo Pressione qualquer tecla para continuar...
-pause >nul
+pause
