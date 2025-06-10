@@ -1,12 +1,19 @@
+build:
+	docker-compose build
+
+up:
+	docker-compose up
+
+down:
+	docker-compose down
+
+run:
+	docker-compose up --build
+
 lint:
-	uv run black .
-	uv run isort .
-	uv run ruff check --fix .
-	uv run autoflake --in-place -r --remove-all-unused-imports --remove-unused-variables .
-	uv run flake8 .
+	pre-commit run --all-files
 
-pre-commit:
-	uv run pre-commit run --all-files
-
-streamlit:
-	streamlit run app/Repense.py
+install:
+	pip install --upgrade pip
+	pip install uv
+	uv sync

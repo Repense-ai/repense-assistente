@@ -21,30 +21,62 @@ st.set_page_config(
 )
 
 # Initialize Redis client
-redis_client = redis.Redis.from_url(
-    os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
-)
+try:
+    redis_client = redis.Redis.from_url(
+        os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
+    )
+    redis_client.ping()  # Check connection
+except redis.exceptions.ConnectionError as e:
+    st.error(f"Não foi possível conectar ao Redis. Verifique se os serviços estão rodando. Detalhes: {e}")
+    st.stop()
 
-# Initialize OpenAI client
-client = OpenAI()
+# --- API Key and Client Initialization ---
+openai_api_key_manager = RedisManager(redis_client, "secrets:openai_api_key")
+api_key = openai_api_key_manager.get_memory_dict().get('key')
+
+if not api_key:
+    st.warning("⚠️ A chave da API da OpenAI não foi configurada.")
+    if st.button("Ir para Configurações"):
+        st.switch_page("pages/Configurações.py")
+    st.stop()
+
+try:
+    client = OpenAI(api_key=api_key)
+    client.models.list()  # Test the key
+except Exception as e:
+    st.error(f"A chave de API configurada é inválida ou expirou. Por favor, atualize-a na página de configurações. Erro: {e}")
+    if st.button("Ir para Configurações"):
+        st.switch_page("pages/Configurações.py")
+    st.stop()
+
+# Initialize config manager
+config_manager = RedisManager(redis_client, "config")
+config = config_manager.get_memory_dict()
 
 # Initialize Redis manager for persistent chat history
 chat_manager = RedisManager(redis_client, "chat_history")
-config_manager = RedisManager(redis_client, "config")
-
 stored_messages = chat_manager.get_memory_dict()
-config = config_manager.get_memory_dict()
+
+if not config:
+    config = {
+        "business_name": "",
+        "business_description": "",
+        "business_segment": "",
+        "assistant_name": "",
+        "tone": "",
+        "use_emojis": "",
+        "instructions": "",
+    }    
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "system", "content": PROMPT_ASSISTENTE.format(**config)},
-    ]
-
-# Load stored messages into session state if available
-if stored_messages and "messages" in stored_messages:
-    if not st.session_state.messages:  # Only load if session is empty
+    # Load from Redis if available, otherwise start fresh
+    if stored_messages and "messages" in stored_messages:
         st.session_state.messages = stored_messages["messages"]
+    else:
+        st.session_state.messages = [
+            {"role": "system", "content": PROMPT_ASSISTENTE.format(**config)},
+        ]
 
 # Chat interface header
 st.header("💬 Assistente Virtual")
@@ -75,16 +107,16 @@ if prompt := st.chat_input("Digite sua mensagem..."):
         # Get assistant response
         try:
             # Create the messages list for the API call
-            messages = [
+            messages_for_api = [
                 {"role": m["role"], "content": m["content"]}
                 for m in st.session_state.messages
             ]
 
             # Make API call
             response = client.chat.completions.create(
-                model="gpt-4.1",  # Using the latest model
-                messages=messages,
-                stream=True,  # Enable streaming
+                model="gpt-4.1",  # Recommended model
+                messages=messages_for_api,
+                stream=True,
                 temperature=0.7,
             )
 
@@ -111,7 +143,7 @@ if prompt := st.chat_input("Digite sua mensagem..."):
             )
 
         except Exception as e:
-            st.error(f"Error: {e!s}")
+            st.error(f"Ocorreu um erro ao comunicar com a OpenAI: {e}")
 
 # Sidebar with chat controls
 with st.sidebar:
@@ -126,7 +158,7 @@ with st.sidebar:
     # Download chat history
     if st.session_state.messages:
         chat_text = "\n\n".join(
-            [f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages]
+            [f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages if m['role'] != 'system']
         )
 
         st.download_button(
