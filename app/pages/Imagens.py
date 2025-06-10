@@ -1,6 +1,7 @@
 import json
 import os
 
+import redis
 import streamlit as st
 
 from app.prompts.templates import (
@@ -11,84 +12,89 @@ from app.prompts.templates import (
     LIGHTING,
 )
 from src.image import OpenAIImages, get_memory_buffer
+from src.memory import RedisManager
 
 # Configuração da página
 st.set_page_config(page_title="Estúdio de Imagens IA", page_icon="🎨", layout="wide")
+
+# Initialize Redis client
+try:
+    redis_client = redis.Redis.from_url(
+        os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
+    )
+    redis_client.ping()  # Check connection
+except redis.exceptions.ConnectionError as e:
+    st.error(
+        f"Não foi possível conectar ao Redis. Verifique se os serviços estão rodando. Detalhes: {e}"
+    )
+    st.stop()
+
+# Initialize OpenAI client
+config_manager = RedisManager(redis_client, "config")
+# Safely get config, default to an empty dict if it doesn't exist
+config = config_manager.get_memory_dict() or {}
+api_key = config.get("OPENAI_API_KEY")
+
+if not api_key:
+    st.warning("⚠️ A chave de API da OpenAI não foi configurada.")
+    st.info("Por favor, vá para a página de configurações para adicionar sua chave.")
+    if st.button("Ir para Configurações"):
+        st.switch_page("pages/Configurações.py")
+    st.stop()
+
+# Initialize OpenAI client and store in session state
+if "openai_client" not in st.session_state:
+    try:
+        st.session_state.openai_client = OpenAIImages(api_key=api_key)
+    except Exception as e:
+        st.error(
+            f"A chave de API configurada é inválida ou expirou. Por favor, atualize-a na página de configurações. Erro: {e}"
+        )
+        if st.button("Ir para Configurações"):
+            st.switch_page("pages/Configurações.py")
+        st.stop()
+
+# Initialize Redis Manager for saved prompts
+prompts_manager = RedisManager(redis_client, "saved_prompts")
 
 # Inicializa variáveis de estado da sessão
 if "generated_images" not in st.session_state:
     st.session_state.generated_images = []
 if "image_costs" not in st.session_state:
     st.session_state.image_costs = []
-if "openai_client" not in st.session_state:
-    st.session_state.openai_client = None
 if "prompt" not in st.session_state:
     st.session_state.prompt = ""
 if "saved_prompts" not in st.session_state:
-    st.session_state.saved_prompts = {}
-
-# Configuração do diretório para salvar os prompts
-PROMPTS_DIR = "app/assets/saved_prompts"
-PROMPTS_FILE = os.path.join(PROMPTS_DIR, "personal_prompts.json")
-
-# Criar diretório se não existir
-os.makedirs(PROMPTS_DIR, exist_ok=True)
-
-
-def load_saved_prompts() -> None:
-    """Carrega prompts salvos do arquivo."""
-    try:
-        if os.path.exists(PROMPTS_FILE):
-            with open(PROMPTS_FILE, encoding="utf-8") as f:
-                st.session_state.saved_prompts = json.load(f)
-    except Exception as e:
-        st.error(f"Erro ao carregar prompts: {e}")
-
+    st.session_state.saved_prompts = prompts_manager.get_memory_dict()
 
 def save_prompt(name: str, prompt_text: str) -> bool:
-    """Salva um novo prompt no arquivo."""
+    """Salva um novo prompt no Redis."""
     try:
-        st.session_state.saved_prompts[name] = prompt_text
-        with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
-            json.dump(st.session_state.saved_prompts, f, ensure_ascii=False, indent=2)
+        current_prompts = st.session_state.saved_prompts
+        current_prompts[name] = prompt_text
+        prompts_manager.set_memory_dict(current_prompts)
+        st.session_state.saved_prompts = current_prompts  # Update session state
         return True
     except Exception as e:
         st.error(f"Erro ao salvar prompt: {e}")
         return False
 
-
 def delete_prompt(name: str) -> bool:
-    """Deleta um prompt salvo."""
+    """Deleta um prompt salvo do Redis."""
     try:
-        if name in st.session_state.saved_prompts:
-            del st.session_state.saved_prompts[name]
-            with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
-                json.dump(
-                    st.session_state.saved_prompts, f, ensure_ascii=False, indent=2
-                )
+        current_prompts = st.session_state.saved_prompts
+        if name in current_prompts:
+            del current_prompts[name]
+            prompts_manager.set_memory_dict(current_prompts)
+            st.session_state.saved_prompts = current_prompts  # Update session state
         return True
     except Exception as e:
         st.error(f"Erro ao deletar prompt: {e}")
         return False
 
-
-def initialize_openai_client() -> bool:
-    """Inicializa o cliente OpenAI."""
-    try:
-        st.session_state.openai_client = OpenAIImages()
-        return True
-    except Exception as e:
-        st.error(f"Erro ao inicializar o cliente OpenAI: {e!s}")
-        return False
-
-
 def format_cost(cost: float) -> str:
     """Formata o custo em dólares."""
     return f"US$ {cost:.4f}"
-
-
-# Carrega prompts salvos ao iniciar
-load_saved_prompts()
 
 # Sidebar para gerenciar prompts salvos
 with st.sidebar:
@@ -104,7 +110,7 @@ with st.sidebar:
     # Seção para carregar prompts
     if st.session_state.saved_prompts:
         st.markdown("### Carregar Prompt")
-        for name, saved_prompt in st.session_state.saved_prompts.items():
+        for name, saved_prompt in list(st.session_state.saved_prompts.items()):
             col1, col2 = st.columns([3, 1])
             with col1:
                 if st.button(f"📜 {name}", key=f"load_{name}"):
@@ -205,8 +211,8 @@ with st.form("image_form"):
     submit_button = st.form_submit_button("Processar Imagem")
 
     if submit_button and st.session_state.prompt:
-        if not st.session_state.openai_client and not initialize_openai_client():
-            st.error("Falha ao inicializar o cliente OpenAI")
+        if not st.session_state.openai_client:
+            st.error("Cliente OpenAI não inicializado. Verifique as configurações da API.")
         else:
             with st.spinner("Processando..."):
                 try:

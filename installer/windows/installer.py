@@ -453,25 +453,26 @@ class RepensenAssistenteInstaller:
 
                 # Baixar e instalar
                 if self.download_and_extract():
-                    self.update_progress(95)
+                    self.update_progress(80)
+
+                    # Forçar a reconstrução dos serviços após a atualização
+                    self.log("Forçando reconstrução dos serviços após a atualização...")
+                    self.update_status("Reconstruindo imagens...")
+                    if not self.rebuild_services(from_install=True):
+                        # Se a reconstrução falhar, o processo para aqui
+                        raise Exception("Falha ao reconstruir as imagens Docker após a atualização.")
 
                     # Salvar configurações
                     self.save_config()
                     self.update_progress(100)
 
-                    self.log("Instalação concluída com sucesso!")
+                    self.log("Instalação e atualização concluídas com sucesso!")
                     self.update_status("Instalado - Pronto para usar")
-
-                    # Habilitar botões
-                    self.start_btn.config(state=tk.NORMAL)
-                    self.rebuild_btn.config(state=tk.NORMAL)
-                    
-                    # Manter o botão de configurar desabilitado até os serviços iniciarem
-                    self.config_btn.config(state=tk.DISABLED)
 
                     messagebox.showinfo(
                         "Sucesso",
-                        "Instalação concluída! Inicie os serviços e depois configure a chave de API.",
+                        "A aplicação foi instalada/atualizada com sucesso! "
+                        "Os serviços foram reconstruídos e estão prontos para iniciar.",
                     )
                 else:
                     self.update_status("Erro na instalação")
@@ -486,17 +487,18 @@ class RepensenAssistenteInstaller:
         # Executar em thread separada
         threading.Thread(target=run_install, daemon=True).start()
 
-    def rebuild_services(self):
+    def rebuild_services(self, from_install=False):
         """Reconstrói as imagens Docker e reinicia os serviços"""
 
         def run_rebuild():
-            if not messagebox.askyesno(
+            if not from_install and not messagebox.askyesno(
                 "Confirmar Reconstrução",
                 "Isso irá reconstruir todas as imagens do zero e reiniciar os serviços. "
                 "Pode levar vários minutos. Deseja continuar?",
             ):
                 return
-
+            
+            rebuild_success = False
             try:
                 self.rebuild_btn.config(state=tk.DISABLED)
                 self.start_btn.config(state=tk.DISABLED)
@@ -507,9 +509,9 @@ class RepensenAssistenteInstaller:
                 self.stop_services(from_rebuild=True)
                 time.sleep(5)  # Aguardar parada
 
-                self.log("Iniciando reconstrução das imagens (build --no-cache)...")
+                self.log("Iniciando reconstrução das imagens (build --no-cache --pull)...")
                 process = subprocess.Popen(
-                    ["docker", "compose", "build", "--no-cache"],
+                    ["docker", "compose", "build", "--no-cache", "--pull"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -527,9 +529,14 @@ class RepensenAssistenteInstaller:
 
                 if process.returncode == 0:
                     self.log("Imagens reconstruídas com sucesso!")
-                    self.update_status("Reconstrução concluída. Reiniciando...")
-                    # Reiniciar os serviços
-                    self.start_services()
+                    self.update_status("Reconstrução concluída.")
+                    rebuild_success = True
+
+                    # Se não for chamado pela instalação, reinicia os serviços
+                    if not from_install:
+                        self.log("Reiniciando serviços após a reconstrução...")
+                        self.update_status("Reiniciando serviços...")
+                        self.start_services()
                 else:
                     self.log("Erro ao reconstruir imagens.")
                     self.update_status("Erro na reconstrução")
@@ -543,8 +550,10 @@ class RepensenAssistenteInstaller:
                 self.rebuild_btn.config(state=tk.NORMAL)
                 self.start_btn.config(state=tk.NORMAL)
                 # O estado de stop_btn será definido por start_services
+            
+            return rebuild_success
 
-        threading.Thread(target=run_rebuild, daemon=True).start()
+        return run_rebuild()
 
     def start_services(self):
         """Inicia os serviços Docker e transmite o output."""
