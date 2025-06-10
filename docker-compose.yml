@@ -66,6 +66,3 @@ services:
     depends_on:
       - waha
       - redis
-      - fastapi
-    networks:
-      - waha-network

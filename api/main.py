@@ -103,7 +103,11 @@ async def webhook(request: Request) -> dict:
 
             # Get assistant response
             try:
-                client = OpenAI()
+                api_key = config.get("OPENAI_API_KEY")
+                if not api_key:
+                    raise ValueError("OPENAI_API_KEY not found in Redis config")
+
+                client = OpenAI(api_key=api_key)
                 response = client.chat.completions.create(
                     model="gpt-4.1",
                     messages=messages,

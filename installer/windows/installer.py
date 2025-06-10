@@ -128,6 +128,14 @@ class RepensenAssistenteInstaller:
         )
         self.uninstall_btn.pack(side=tk.LEFT, padx=5)
 
+        self.rebuild_btn = ttk.Button(
+            button_frame,
+            text="Reconstruir Serviços",
+            command=self.rebuild_services,
+            state=tk.DISABLED,
+        )
+        self.rebuild_btn.pack(side=tk.LEFT, padx=5)
+
         # Log
         log_label = ttk.Label(main_frame, text="Log:")
         log_label.grid(row=4, column=0, sticky=(tk.W, tk.N), pady=(10, 0))
@@ -421,6 +429,7 @@ ENVIRONMENT=production
                     # Habilitar botões
                     self.start_btn.config(state=tk.NORMAL)
                     self.open_btn.config(state=tk.NORMAL)
+                    self.rebuild_btn.config(state=tk.NORMAL)
 
                     messagebox.showinfo(
                         "Sucesso",
@@ -438,6 +447,66 @@ ENVIRONMENT=production
 
         # Executar em thread separada
         threading.Thread(target=run_install, daemon=True).start()
+
+    def rebuild_services(self):
+        """Reconstrói as imagens Docker e reinicia os serviços"""
+
+        def run_rebuild():
+            if not messagebox.askyesno(
+                "Confirmar Reconstrução",
+                "Isso irá reconstruir todas as imagens do zero e reiniciar os serviços. "
+                "Pode levar vários minutos. Deseja continuar?",
+            ):
+                return
+
+            try:
+                self.rebuild_btn.config(state=tk.DISABLED)
+                self.start_btn.config(state=tk.DISABLED)
+                self.stop_btn.config(state=tk.DISABLED)
+                self.update_status("Reconstruindo imagens...")
+
+                self.log("Parando serviços antes de reconstruir...")
+                self.stop_services(from_rebuild=True)
+                time.sleep(5)  # Aguardar parada
+
+                self.log("Iniciando reconstrução das imagens (build --no-cache)...")
+                process = subprocess.Popen(
+                    ["docker", "compose", "build", "--no-cache"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    cwd=self.install_dir,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+
+                while True:
+                    line = process.stdout.readline()
+                    if not line:
+                        break
+                    self.log(line.strip())
+                process.wait()
+
+                if process.returncode == 0:
+                    self.log("Imagens reconstruídas com sucesso!")
+                    self.update_status("Reconstrução concluída. Reiniciando...")
+                    # Reiniciar os serviços
+                    self.start_services()
+                else:
+                    self.log("Erro ao reconstruir imagens.")
+                    self.update_status("Erro na reconstrução")
+                    messagebox.showerror("Erro", "Falha ao reconstruir as imagens.")
+
+            except Exception as e:
+                self.log(f"Erro durante a reconstrução: {e!s}")
+                self.update_status("Erro na reconstrução")
+                messagebox.showerror("Erro", f"Erro durante a reconstrução: {e!s}")
+            finally:
+                self.rebuild_btn.config(state=tk.NORMAL)
+                self.start_btn.config(state=tk.NORMAL)
+                # O estado de stop_btn será definido por start_services
+
+        threading.Thread(target=run_rebuild, daemon=True).start()
 
     def start_services(self):
         """Inicia os serviços Docker"""
@@ -465,6 +534,7 @@ ENVIRONMENT=production
 
                     self.stop_btn.config(state=tk.NORMAL)
                     self.open_btn.config(state=tk.NORMAL)
+                    self.rebuild_btn.config(state=tk.NORMAL)
 
                     # Aguardar um pouco para os serviços iniciarem
                     time.sleep(5)
@@ -486,7 +556,7 @@ ENVIRONMENT=production
 
         threading.Thread(target=run_start, daemon=True).start()
 
-    def stop_services(self):
+    def stop_services(self, from_rebuild=False):
         """Para os serviços Docker"""
 
         def run_stop():
@@ -509,14 +579,19 @@ ENVIRONMENT=production
 
                     self.start_btn.config(state=tk.NORMAL)
                     self.open_btn.config(state=tk.DISABLED)
+                    self.rebuild_btn.config(state=tk.NORMAL)
 
                 else:
                     self.log(f"Erro ao parar serviços: {result.stderr}")
                     self.update_status("Erro ao parar")
+                    if not from_rebuild:
+                        messagebox.showerror("Erro", f"Erro ao parar serviços: {result.stderr}")
 
             except Exception as e:
                 self.log(f"Erro ao parar serviços: {e!s}")
                 self.update_status("Erro ao parar")
+                if not from_rebuild:
+                    messagebox.showerror("Erro", f"Erro ao parar serviços: {e!s}")
             finally:
                 self.stop_btn.config(state=tk.NORMAL)
 
@@ -605,6 +680,7 @@ ENVIRONMENT=production
             self.log("Instalação existente encontrada")
             self.update_status("Instalado")
             self.start_btn.config(state=tk.NORMAL)
+            self.rebuild_btn.config(state=tk.NORMAL)
 
             # Verificar se os serviços estão rodando
             try:
@@ -621,6 +697,7 @@ ENVIRONMENT=production
                     self.is_running = True
                     self.stop_btn.config(state=tk.NORMAL)
                     self.open_btn.config(state=tk.NORMAL)
+                    self.rebuild_btn.config(state=tk.NORMAL)
                     self.check_services_status()
 
             except:
