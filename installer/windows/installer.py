@@ -16,10 +16,286 @@ from typing import Any
 import requests
 import redis
 
+# Documentação integrada
+DOCKER_INSTALLATION_GUIDE = """
+INSTALAÇÃO DO DOCKER DESKTOP - PASSO A PASSO
+
+O Docker Desktop é necessário para executar o Repense Assistente. 
+Siga estes passos para instalá-lo:
+
+1. DOWNLOAD:
+   • Acesse: https://www.docker.com/products/docker-desktop/
+   • Clique em "Download for Windows"
+   • Aguarde o download do arquivo "Docker Desktop Installer.exe"
+
+2. INSTALAÇÃO:
+   • Execute o arquivo baixado como administrador
+   • Aceite os termos de licença
+   • Mantenha as opções padrão selecionadas
+   • Clique em "Install" e aguarde a instalação
+   • Reinicie o computador quando solicitado
+
+3. CONFIGURAÇÃO INICIAL:
+   • Após reiniciar, o Docker Desktop será iniciado automaticamente
+   • Aceite os termos de serviço
+   • Opcionalmente, crie uma conta Docker Hub (não obrigatório)
+   • Aguarde o Docker finalizar a inicialização
+
+4. VERIFICAÇÃO:
+   • Procure o ícone da "baleia" na bandeja do sistema (próximo ao relógio)
+   • O ícone deve estar azul/verde, indicando que o Docker está rodando
+   • Se estiver cinza, clique nele para iniciar o Docker
+
+5. TESTE:
+   • Abra o Prompt de Comando (cmd)
+   • Digite: docker --version
+   • Se aparecer a versão do Docker, a instalação foi bem-sucedida
+
+REQUISITOS MÍNIMOS:
+• Windows 10 versão 2004 ou superior (Build 19041)
+• WSL 2 (será instalado automaticamente)
+• Virtualização habilitada no BIOS
+• 4GB de RAM (recomendado 8GB)
+
+PROBLEMAS COMUNS:
+• Erro de WSL: Execute "wsl --install" no PowerShell como administrador
+• Virtualização desabilitada: Acesse o BIOS e habilite VT-x/AMD-V
+• Docker não inicia: Reinicie o serviço do Docker Desktop
+
+Após instalar o Docker, volte a este instalador e clique em "Instalar/Atualizar".
+"""
+
+USER_DOCUMENTATION = """
+REPENSE ASSISTENTE - DOCUMENTAÇÃO COMPLETA
+
+═══════════════════════════════════════════════════════════════
+
+📋 ÍNDICE:
+1. Introdução
+2. Pré-requisitos
+3. Como Usar o Instalador
+4. Configuração da API OpenAI
+5. Acessos e URLs
+6. Solução de Problemas
+7. Funcionalidades Avançadas
+8. Suporte
+
+═══════════════════════════════════════════════════════════════
+
+1. INTRODUÇÃO
+
+O Repense Assistente é uma plataforma de IA para atendimento automatizado 
+via WhatsApp. Esta ferramenta permite:
+
+✅ Atendimento automatizado 24/7
+✅ Integração com WhatsApp Web
+✅ Interface web intuitiva
+✅ API para integrações customizadas
+✅ Banco de dados Redis para persistência
+
+═══════════════════════════════════════════════════════════════
+
+2. PRÉ-REQUISITOS
+
+SISTEMA OPERACIONAL:
+• Windows 10 versão 2004 ou superior
+• Windows 11 (recomendado)
+
+SOFTWARE NECESSÁRIO:
+• Docker Desktop (será orientada a instalação se necessário)
+• Conexão com internet estável
+• Navegador web moderno (Chrome, Firefox, Edge)
+
+RECURSOS MÍNIMOS:
+• 4GB de RAM (8GB recomendado)
+• 10GB de espaço em disco
+• Processador dual-core
+
+CHAVES DE API:
+• OpenAI API Key (obrigatório)
+• Outras integrações conforme necessário
+
+═══════════════════════════════════════════════════════════════
+
+3. COMO USAR O INSTALADOR
+
+PRIMEIRO USO:
+
+1. Execute este instalador como ADMINISTRADOR
+2. Clique em "Instalar/Atualizar"
+3. Aguarde o download e instalação dos componentes
+4. Clique em "Iniciar Serviços"
+5. Configure sua chave OpenAI
+6. Clique em "Abrir Interface"
+
+BOTÕES PRINCIPAIS:
+
+• Instalar/Atualizar: Baixa e instala a versão mais recente
+• Iniciar Serviços: Liga todos os containers Docker
+• Parar Serviços: Para todos os containers Docker
+• Abrir Interface: Abre a interface web (localhost:8501)
+• Conectar WhatsApp: Acessa configuração do WhatsApp
+• Documentação: Exibe esta ajuda
+• Desinstalar: Remove completamente o sistema
+
+ATUALIZAÇÕES:
+O instalador verifica automaticamente por atualizações no GitHub
+e notifica quando há versões mais recentes disponíveis.
+
+═══════════════════════════════════════════════════════════════
+
+4. CONFIGURAÇÃO DA API OPENAI
+
+A chave da OpenAI é essencial para o funcionamento do assistente.
+
+COMO OBTER A CHAVE:
+1. Acesse: https://platform.openai.com/api-keys
+2. Faça login na sua conta OpenAI
+3. Clique em "Create new secret key"
+4. Copie a chave gerada (começa com "sk-")
+
+COMO CONFIGURAR NO INSTALADOR:
+1. Com os serviços rodando, a configuração é automática via interface
+2. A chave é armazenada com segurança no Redis
+3. Não é necessário editar arquivos manualmente
+
+IMPORTANTE:
+• Mantenha sua chave em segurança
+• Não compartilhe com terceiros
+• Monitore o uso na plataforma OpenAI
+• Configure limites de gastos se necessário
+
+═══════════════════════════════════════════════════════════════
+
+5. ACESSOS E URLS
+
+Após iniciar os serviços, os seguintes endereços ficam disponíveis:
+
+INTERFACE PRINCIPAL:
+• URL: http://localhost:8501
+• Descrição: Interface web principal do Repense Assistente
+• Use: Configurações, conversas, análises
+
+API BACKEND:
+• URL: http://localhost:8000
+• Descrição: API REST para integrações
+• Docs: http://localhost:8000/docs (Swagger)
+
+WHATSAPP (WAHA):
+• URL: http://localhost:3000
+• Descrição: Interface para configurar WhatsApp
+• Use: Conectar/desconectar WhatsApp Web
+
+REDIS:
+• Host: localhost
+• Porta: 6380
+• Descrição: Banco de dados para configurações
+
+═══════════════════════════════════════════════════════════════
+
+6. SOLUÇÃO DE PROBLEMAS
+
+DOCKER NÃO ENCONTRADO:
+• Instale o Docker Desktop
+• Reinicie o computador
+• Verifique se o ícone da "baleia" está na bandeja
+
+ERRO DE PERMISSÕES:
+• Execute sempre como administrador
+• Desabilite antivírus temporariamente
+• Verifique permissões da pasta do usuário
+
+SERVIÇOS NÃO INICIAM:
+• Verifique se as portas estão livres (3000, 6380, 8000, 8501)
+• Reinicie o Docker Desktop
+• Verifique logs no instalador
+
+PORTAS EM USO:
+Execute no cmd para verificar:
+netstat -ano | findstr ":8501"
+netstat -ano | findstr ":8000"
+netstat -ano | findstr ":3000"
+netstat -ano | findstr ":6380"
+
+PERFORMANCE LENTA:
+• Aumente recursos do Docker (Settings > Resources)
+• Feche programas desnecessários
+• Verifique espaço em disco
+
+ERRO DE CONFIGURAÇÃO:
+• Verifique se a chave OpenAI está correta
+• Confirme se o Redis está rodando
+• Reinicie os serviços se necessário
+
+CONTAINERS NÃO RESPONDEM:
+1. Pare os serviços
+2. Execute: docker system prune -f
+3. Reinicie os serviços
+
+═══════════════════════════════════════════════════════════════
+
+7. FUNCIONALIDADES AVANÇADAS
+
+LOGS E MONITORAMENTO:
+• Logs são exibidos em tempo real no instalador
+• Para logs detalhados: docker compose logs
+• Para um serviço específico: docker compose logs [nome_servico]
+
+BACKUP E RESTAURAÇÃO:
+• Configurações ficam em: %USERPROFILE%\\RepensenAssistente
+• Backup do Redis: docker exec redis redis-cli save
+• Dados persistem entre reinicializações
+
+CUSTOMIZAÇÕES:
+• Arquivos de configuração em: %USERPROFILE%\\RepensenAssistente
+• docker-compose.yml pode ser editado para customizações
+• Variáveis de ambiente no arquivo .env
+
+INTEGRAÇÕES:
+• API disponível em localhost:8000/docs
+• Webhook para WhatsApp configurável
+• Suporte a múltiplos formatos de dados
+
+═══════════════════════════════════════════════════════════════
+
+8. SUPORTE
+
+DOCUMENTAÇÃO TÉCNICA:
+• GitHub: https://github.com/Repense-ai/repense-assistente
+• Issues: Reporte problemas no GitHub
+
+LOGS IMPORTANTES:
+Sempre inclua os seguintes logs ao reportar problemas:
+• Logs do instalador (visíveis na interface)
+• docker compose logs (no terminal)
+• Versão do Windows e Docker
+
+ANTES DE REPORTAR:
+1. Verifique se o Docker está rodando
+2. Confirme que tem a versão mais recente
+3. Tente reinstalar se necessário
+4. Verifique se as portas estão livres
+
+INFORMAÇÕES DO SISTEMA:
+Para suporte, tenha em mãos:
+• Versão do Windows (winver)
+• Versão do Docker (docker --version)
+• Logs de erro específicos
+• Passos para reproduzir o problema
+
+═══════════════════════════════════════════════════════════════
+
+VERSÃO DA DOCUMENTAÇÃO: 1.0.0
+ÚLTIMA ATUALIZAÇÃO: """ + datetime.now().strftime("%d/%m/%Y") + """
+
+Para mais informações, visite:
+https://github.com/Repense-ai/repense-assistente
+"""
+
 
 class RepensenAssistenteInstaller:
     def __init__(self):
-        self.app_name = "Repense Assistente"
+        self.app_name = "repense-assistente"
         self.version = "1.0.0"
         # O repositório GitHub é usado para verificar atualizações.
         self.github_repo = "Repense-ai/repense-assistente"
@@ -139,23 +415,33 @@ class RepensenAssistenteInstaller:
         app_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=5)
 
         self.open_app_btn = ttk.Button(
-            app_frame, text="Abrir App", command=self.open_interface, state=tk.DISABLED
+            app_frame, text="Abrir Interface", command=self.open_interface, state=tk.DISABLED
         )
         self.open_app_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         self.whatsapp_btn = ttk.Button(
             app_frame,
-            text="Configurar WhatsApp",
+            text="Conectar WhatsApp",
             command=self.open_whatsapp_config,
             state=tk.DISABLED,
         )
         self.whatsapp_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
-        # --- Administration ---
+        # --- Help and Administration ---
         admin_frame = ttk.LabelFrame(
-            button_container, text="Administração", padding="10"
+            button_container, text="Ajuda e Administração", padding="10"
         )
         admin_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=5)
+
+        self.help_btn = ttk.Button(
+            admin_frame, text="Documentação", command=self.show_documentation
+        )
+        self.help_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        self.docker_help_btn = ttk.Button(
+            admin_frame, text="Instalar Docker", command=self.show_docker_guide
+        )
+        self.docker_help_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         self.uninstall_btn = ttk.Button(
             admin_frame, text="Desinstalar", command=self.uninstall
@@ -173,6 +459,129 @@ class RepensenAssistenteInstaller:
 
         # Verificar status inicial
         self.check_initial_status()
+
+    def show_documentation(self):
+        """Exibe a documentação completa em uma nova janela"""
+        doc_window = tk.Toplevel(self.root)
+        doc_window.title("Documentação - Repense Assistente")
+        doc_window.geometry("900x700")
+        doc_window.resizable(True, True)
+
+        # Frame principal
+        main_frame = ttk.Frame(doc_window, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Título
+        title_label = ttk.Label(
+            main_frame, 
+            text="📚 Documentação Completa", 
+            font=("Arial", 16, "bold")
+        )
+        title_label.pack(pady=(0, 10))
+
+        # Área de texto com scroll
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+
+        text_widget = scrolledtext.ScrolledText(
+            text_frame, 
+            wrap=tk.WORD, 
+            font=("Consolas", 10),
+            bg="#f8f9fa",
+            fg="#212529"
+        )
+        text_widget.pack(fill=tk.BOTH, expand=True)
+        text_widget.insert(tk.END, USER_DOCUMENTATION)
+        text_widget.config(state=tk.DISABLED)
+
+        # Botão para fechar
+        close_btn = ttk.Button(
+            main_frame, 
+            text="Fechar", 
+            command=doc_window.destroy
+        )
+        close_btn.pack(pady=(10, 0))
+
+    def show_docker_guide(self):
+        """Exibe o guia de instalação do Docker em uma nova janela"""
+        docker_window = tk.Toplevel(self.root)
+        docker_window.title("Guia de Instalação - Docker Desktop")
+        docker_window.geometry("800x600")
+        docker_window.resizable(True, True)
+
+        # Frame principal
+        main_frame = ttk.Frame(docker_window, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Título
+        title_label = ttk.Label(
+            main_frame, 
+            text="🐳 Como Instalar o Docker Desktop", 
+            font=("Arial", 16, "bold")
+        )
+        title_label.pack(pady=(0, 10))
+
+        # Área de texto com scroll
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+
+        text_widget = scrolledtext.ScrolledText(
+            text_frame, 
+            wrap=tk.WORD, 
+            font=("Consolas", 10),
+            bg="#f8f9fa",
+            fg="#212529"
+        )
+        text_widget.pack(fill=tk.BOTH, expand=True)
+        text_widget.insert(tk.END, DOCKER_INSTALLATION_GUIDE)
+        text_widget.config(state=tk.DISABLED)
+
+        # Frame para botões
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(10, 0))
+
+        # Botão para abrir página do Docker
+        download_btn = ttk.Button(
+            button_frame, 
+            text="🌐 Abrir Página de Download", 
+            command=lambda: webbrowser.open("https://www.docker.com/products/docker-desktop/")
+        )
+        download_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        # Botão para verificar Docker
+        check_btn = ttk.Button(
+            button_frame, 
+            text="🔍 Verificar Docker", 
+            command=self.check_docker_from_guide
+        )
+        check_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        # Botão para fechar
+        close_btn = ttk.Button(
+            button_frame, 
+            text="Fechar", 
+            command=docker_window.destroy
+        )
+        close_btn.pack(side=tk.RIGHT)
+
+    def check_docker_from_guide(self):
+        """Verifica se o Docker está instalado a partir do guia"""
+        if self.check_docker_installed() and self.check_docker_compose_installed():
+            messagebox.showinfo(
+                "Docker Detectado", 
+                "✅ Docker Desktop foi detectado com sucesso!\n\n"
+                "Agora você pode fechar esta janela e usar o instalador normalmente."
+            )
+        else:
+            messagebox.showwarning(
+                "Docker Não Detectado", 
+                "❌ Docker Desktop ainda não foi detectado.\n\n"
+                "Certifique-se de que:\n"
+                "• O Docker Desktop foi instalado corretamente\n"
+                "• O computador foi reiniciado após a instalação\n"
+                "• O Docker Desktop está rodando (ícone da baleia na bandeja)\n\n"
+                "Tente novamente após verificar estes pontos."
+            )
 
     def log(self, message: str):
         """Adiciona mensagem ao log"""
@@ -242,15 +651,94 @@ class RepensenAssistenteInstaller:
         return False
 
     def install_docker_desktop(self):
-        """Guia o usuário para instalar o Docker Desktop"""
+        """Guia o usuário para instalar o Docker Desktop com instruções detalhadas"""
         message = (
-            "Docker não foi encontrado no sistema.\n\n"
-            "Para usar o Repense Assistente, você precisa instalar o Docker Desktop.\n\n"
-            "Clique em 'Sim' para abrir a página de download do Docker Desktop.\n"
-            "Após a instalação, reinicie este instalador."
+            "🐳 DOCKER NÃO ENCONTRADO\n\n"
+            "O Docker Desktop é necessário para executar o Repense Assistente.\n\n"
+            "OPÇÕES:\n\n"
+            "📖 Ver Guia Completo: Instruções detalhadas passo a passo\n"
+            "🌐 Download Direto: Ir direto para a página de download\n"
+            "❌ Cancelar: Sair sem instalar\n\n"
+            "Recomendamos ver o guia completo primeiro."
         )
 
-        if messagebox.askyesno("Docker não encontrado", message):
+        # Criar janela customizada
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Docker Não Encontrado")
+        dialog.geometry("500x300")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Centralizar na tela
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (300 // 2)
+        dialog.geometry(f"500x300+{x}+{y}")
+
+        result = {"choice": None}
+
+        # Frame principal
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Ícone e título
+        title_frame = ttk.Frame(main_frame)
+        title_frame.pack(fill=tk.X, pady=(0, 20))
+
+        title_label = ttk.Label(
+            title_frame, 
+            text="🐳 Docker Desktop Necessário", 
+            font=("Arial", 14, "bold")
+        )
+        title_label.pack()
+
+        # Mensagem
+        msg_label = ttk.Label(
+            main_frame, 
+            text=message, 
+            wraplength=450,
+            justify=tk.LEFT
+        )
+        msg_label.pack(pady=(0, 20))
+
+        # Frame para botões
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+
+        def set_choice(choice):
+            result["choice"] = choice
+            dialog.destroy()
+
+        # Botões
+        guide_btn = ttk.Button(
+            button_frame, 
+            text="📖 Ver Guia Completo", 
+            command=lambda: set_choice("guide")
+        )
+        guide_btn.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+
+        download_btn = ttk.Button(
+            button_frame, 
+            text="🌐 Download Direto", 
+            command=lambda: set_choice("download")
+        )
+        download_btn.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+
+        cancel_btn = ttk.Button(
+            button_frame, 
+            text="❌ Cancelar", 
+            command=lambda: set_choice("cancel")
+        )
+        cancel_btn.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+
+        # Aguardar escolha
+        dialog.wait_window()
+
+        # Processar escolha
+        if result["choice"] == "guide":
+            self.show_docker_guide()
+        elif result["choice"] == "download":
             webbrowser.open("https://www.docker.com/products/docker-desktop/")
 
         return False
@@ -498,16 +986,18 @@ class RepensenAssistenteInstaller:
                     self.update_status("Reiniciando serviços...")
                     self.start_services()
             else:
-                self.log("Erro ao reconstruir imagens.")
-                self.update_status("Erro na reconstrução")
-                messagebox.showerror("Erro", "Falha ao reconstruir as imagens.")
+                self.log("Erro durante a reconstrução das imagens.")
+                self.update_status("Erro na reconstrução.")
 
         except Exception as e:
-            self.log(f"Erro durante a reconstrução: {e!s}")
+            self.log(f"Erro durante reconstrução: {e!s}")
             self.update_status("Erro na reconstrução")
-            messagebox.showerror("Erro", f"Erro durante a reconstrução: {e!s}")
-        finally:
-            self.start_btn.config(state=tk.NORMAL)
+        
+        if rebuild_success and not from_install:
+            self.log("Reconstrução e reinicialização concluídas!")
+        elif rebuild_success:
+            self.log("Reconstrução concluída!")
+
         return rebuild_success
 
     def start_services(self):
@@ -652,7 +1142,7 @@ class RepensenAssistenteInstaller:
 
     def open_whatsapp_config(self):
         """Abre a página de configuração do WhatsApp no app"""
-        url = "http://localhost:8501/Configurações"
+        url = "http://localhost:3000/dashboard"
         self.log(f"Abrindo configurações do WhatsApp: {url}")
         webbrowser.open(url)
 

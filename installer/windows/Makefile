@@ -5,7 +5,7 @@
 PYTHON = python
 PIP = pip
 PYINSTALLER = pyinstaller
-INSTALLER_NAME = RepensenAssistente-Installer
+INSTALLER_NAME = repense-assistente
 DIST_DIR = dist
 BUILD_DIR = build
 

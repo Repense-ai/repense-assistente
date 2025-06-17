@@ -134,7 +134,7 @@ def main():
     if not run_pyinstaller():
         sys.exit(1)
 
-    installer_path = DIST_DIR / "RepensenAssistente-Installer.exe"
+    installer_path = DIST_DIR / "repense-assistente.exe"
     if installer_path.exists():
         log(f"\nBuild successful! Installer created at:")
         log(str(installer_path), "SUCCESS")

@@ -6,7 +6,7 @@ set "SCRIPT_DIR=%~dp0"
 
 echo ===================================
 echo  Build do Instalador Windows
-echo  Repense Assistente
+echo  repense-assistente
 echo ===================================
 echo.
 

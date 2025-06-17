@@ -32,9 +32,9 @@ VSVersionInfo(
         [StringStruct(u'CompanyName', u'Repense AI'),
         StringStruct(u'FileDescription', u'Instalador do Repense Assistente'),
         StringStruct(u'FileVersion', u'1.0.0.0'),
-        StringStruct(u'InternalName', u'RepensenAssistente-Installer'),
+        StringStruct(u'InternalName', u'repense-assistente'),
         StringStruct(u'LegalCopyright', u'Copyright © 2024 Repense AI'),
-        StringStruct(u'OriginalFilename', u'RepensenAssistente-Installer.exe'),
+        StringStruct(u'OriginalFilename', u'repense-assistente.exe'),
         StringStruct(u'ProductName', u'Repense Assistente'),
         StringStruct(u'ProductVersion', u'1.0.0.0')])
       ]),
